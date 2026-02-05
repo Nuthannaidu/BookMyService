@@ -2,6 +2,11 @@ const Appointment = require('../models/Appointment');
 const Schedule = require('../models/Schedule');
 const Service = require('../models/Service');
 
+const isPastEndTime = (date, endTime) => {
+  const appointmentEnd = new Date(`${date}T${endTime}`);
+  return appointmentEnd < new Date();
+};
+
 /* ---------------- Time Helpers ---------------- */
 const toMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -182,12 +187,39 @@ exports.getMyAppointments = async (req, res) => {
 
 /* ---------------- Provider Appointments ---------------- */
 exports.getProviderAppointments = async (req, res) => {
-  const appointments = await Appointment.find({ provider: req.user._id })
-    .populate('user service', 'name')
-    .sort({ date: 1, startTime: 1 });
+  try {
+    const providerId = req.user._id;
 
-  res.json(appointments);
+    let appointments = await Appointment.find({ provider: providerId })
+      .populate('user')
+      .populate('service')
+      .sort({ date: 1, startTime: 1 });
+
+    // 🔥 AUTO-COMPLETE LOGIC
+    const updates = appointments.map(async (appt) => {
+      if (
+        appt.status === 'accepted' &&
+        isPastEndTime(appt.date, appt.endTime)
+      ) {
+        appt.status = 'completed';
+        await appt.save();
+      }
+    });
+
+    await Promise.all(updates);
+
+    // Re-fetch updated appointments
+    appointments = await Appointment.find({ provider: providerId })
+      .populate('user')
+      .populate('service')
+      .sort({ date: 1, startTime: 1 });
+
+    res.json(appointments);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch appointments' });
+  }
 };
+
 
 exports.rescheduleAppointment = async (req, res) => {
   try {
