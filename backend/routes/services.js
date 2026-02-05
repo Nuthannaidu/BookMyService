@@ -11,9 +11,11 @@ const { protect } = require('../middleware/auth');
 
 router.get('/', getAllProvidersWithServices);
 router.post('/', protect, createService);
-router.get('/:providerId', getServicesByProvider);
+
 
 router.put('/:serviceId', protect, updateService);
 router.delete('/:serviceId', protect, deleteService);
+
+router.get('/:providerId', getServicesByProvider);
 
 module.exports = router;
