@@ -13,7 +13,14 @@ const app = express();
 connectDB();
 
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:5173",        // local Vite dev
+    "https://bookmyservice-1.onrender.com" // deployed frontend
+  ],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 
