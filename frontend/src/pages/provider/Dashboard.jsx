@@ -68,7 +68,8 @@ const Dashboard = () => {
     setEditingService((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle nested details (e.g., details.medical.specialization)
+  // Keep this function if you ever want to re-enable editing in future, 
+  // but for now, inputs using this will be read-only.
   const handleEditDetailsChange = (category, field, value) => {
     setEditingService((prev) => ({
       ...prev,
@@ -186,7 +187,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* PENDING REQUESTS SECTION (Unchanged logic, kept for completeness) */}
+        {/* PENDING REQUESTS SECTION */}
         <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Pending Requests</h2>
@@ -226,7 +227,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* MY SERVICES SECTION (NOW WITH EDIT/DELETE) */}
+        {/* MY SERVICES SECTION */}
         <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">My Services</h2>
@@ -289,14 +290,13 @@ const Dashboard = () => {
 
             <form onSubmit={saveEditedService} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Name (Read-Only)</label>
                 <input
                   type="text"
                   name="name"
                   value={editingService.name}
-                  onChange={handleEditChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none"
-                  required
+                  readOnly
+                  className="w-full p-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed outline-none focus:ring-0"
                 />
               </div>
 
@@ -325,11 +325,11 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* DYNAMIC DETAILS EDITING */}
+              {/* DYNAMIC DETAILS - READ ONLY */}
               {editingService.details && editingService.details[editingService.category] && (
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
                   <h4 className="text-xs font-bold text-gray-500 uppercase">
-                    {editingService.category.replace('_', ' ')} Details
+                    {editingService.category.replace('_', ' ')} Details (Locked)
                   </h4>
                   
                   {Object.entries(editingService.details[editingService.category]).map(([key, value]) => (
@@ -340,8 +340,8 @@ const Dashboard = () => {
                       <input
                         type="text"
                         value={value}
-                        onChange={(e) => handleEditDetailsChange(editingService.category, key, e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 outline-none"
+                        readOnly
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-200 text-gray-500 cursor-not-allowed outline-none"
                       />
                     </div>
                   ))}
