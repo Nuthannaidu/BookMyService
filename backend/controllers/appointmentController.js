@@ -6,19 +6,16 @@ const isPastEndTime = (date, endTime) => {
   const appointmentEnd = new Date(`${date}T${endTime}`);
   return appointmentEnd < new Date();
 };
-/* ---------------- Get Schedule (For Provider Dashboard) ---------------- */
 exports.getSchedule = async (req, res) => {
   try {
     const { serviceId } = req.params;
     
-    // Find the schedule for this service and provider
     const schedule = await Schedule.findOne({ 
       provider: req.user._id, 
       service: serviceId 
     });
 
     if (!schedule) {
-      // If no schedule exists yet, return empty defaults
       return res.json({ workingHours: [], unavailableDates: [] });
     }
 
@@ -27,7 +24,7 @@ exports.getSchedule = async (req, res) => {
     res.status(500).json({ message: 'Error fetching schedule' });
   }
 };
-/* ---------------- Time Helpers ---------------- */
+
 const toMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
@@ -39,7 +36,7 @@ const toTime = (minutes) => {
   return `${h}:${m}`;
 };
 
-/* ---------------- Set Schedule ---------------- */
+
 exports.setSchedule = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
@@ -69,7 +66,7 @@ exports.setSchedule = async (req, res) => {
   }
 };
 
-/* ---------------- Get Availability ---------------- */
+
 exports.getAvailability = async (req, res) => {
   try {
     const { providerId, serviceId, date } = req.query;
@@ -83,20 +80,17 @@ exports.getAvailability = async (req, res) => {
     if (schedule.unavailableDates.includes(date)) return res.json([]);
 
     const day = new Date(date).getDay();
-
-    // ✅ CHANGED: Filter ALL shifts for the day (supports split shifts)
     const dailyShifts = schedule.workingHours.filter(d => d.dayOfWeek === day);
     
     if (dailyShifts.length === 0) return res.json([]);
 
     const duration = service.duration;
 
-    /* 🔥 GLOBAL SLOT BLOCKING */
     const appointments = await Appointment.find({
       provider: providerId,
       service: serviceId,
       date,
-      status: { $nin: ['rejected', 'cancelled'] }, // ✅ KEY FIX
+      status: { $nin: ['rejected', 'cancelled'] }, 
     });
 
     const bookedRanges = appointments.map(a => ({
@@ -106,7 +100,7 @@ exports.getAvailability = async (req, res) => {
 
     const slots = [];
 
-    // ✅ CHANGED: Loop through EACH shift found for the day
+   
     for (const shift of dailyShifts) {
       const startMin = toMinutes(shift.startTime);
       const endMin = toMinutes(shift.endTime);
@@ -125,7 +119,6 @@ exports.getAvailability = async (req, res) => {
       }
     }
 
-    // ✅ CHANGED: Sort slots chronologically (Shift 1 -> Shift 2)
     slots.sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
 
     res.json(slots);
@@ -134,7 +127,7 @@ exports.getAvailability = async (req, res) => {
   }
 };
 
-/* ---------------- Request Appointment ---------------- */
+
 exports.requestAppointment = async (req, res) => {
   try {
     const { providerId, serviceId, date, startTime } = req.body;
@@ -145,12 +138,11 @@ exports.requestAppointment = async (req, res) => {
     const startMin = toMinutes(startTime);
     const endMin = startMin + service.duration;
 
-    /* 🔥 PREVENT DOUBLE BOOKING (GLOBAL) */
     const conflict = await Appointment.findOne({
       provider: providerId,
       service: serviceId,
       date,
-      status: { $nin: ['rejected', 'cancelled'] }, // ✅ KEY FIX
+      status: { $nin: ['rejected', 'cancelled'] }, 
       $expr: {
         $and: [
           { $lt: [toMinutes('$startTime'), endMin] },
@@ -170,7 +162,7 @@ exports.requestAppointment = async (req, res) => {
       date,
       startTime,
       endTime: toTime(endMin),
-      status: 'pending', // 🔒 blocks slot immediately
+      status: 'pending', 
     });
 
     res.status(201).json(appointment);
@@ -179,7 +171,7 @@ exports.requestAppointment = async (req, res) => {
   }
 };
 
-/* ---------------- Update Status ---------------- */
+
 exports.updateAppointmentStatus = async (req, res) => {
   const { status } = req.body;
   const appointment = await Appointment.findById(req.params.id);
@@ -195,7 +187,6 @@ exports.updateAppointmentStatus = async (req, res) => {
   res.json(appointment);
 };
 
-/* ---------------- Cancel Appointment ---------------- */
 exports.cancelAppointment = async (req, res) => {
   const appointment = await Appointment.findById(req.params.id);
   if (!appointment) return res.status(404).json({ message: 'Not found' });
@@ -206,7 +197,7 @@ exports.cancelAppointment = async (req, res) => {
   res.json(appointment);
 };
 
-/* ---------------- User Appointments ---------------- */
+
 exports.getMyAppointments = async (req, res) => {
   const appointments = await Appointment.find({ user: req.user._id })
     .populate('provider service', 'name')
@@ -215,7 +206,6 @@ exports.getMyAppointments = async (req, res) => {
   res.json(appointments);
 };
 
-/* ---------------- Provider Appointments ---------------- */
 exports.getProviderAppointments = async (req, res) => {
   try {
     const providerId = req.user._id;
@@ -225,7 +215,7 @@ exports.getProviderAppointments = async (req, res) => {
       .populate('service')
       .sort({ date: 1, startTime: 1 });
 
-    // 🔥 AUTO-COMPLETE LOGIC
+  
     const updates = appointments.map(async (appt) => {
       if (
         appt.status === 'accepted' &&
@@ -238,7 +228,7 @@ exports.getProviderAppointments = async (req, res) => {
 
     await Promise.all(updates);
 
-    // Re-fetch updated appointments
+   
     appointments = await Appointment.find({ provider: providerId })
       .populate('user')
       .populate('service')
@@ -265,7 +255,7 @@ exports.rescheduleAppointment = async (req, res) => {
       return res.status(404).json({ message: 'Appointment not found' });
     }
 
-    // Only the booking user can reschedule
+ 
     if (appointment.user.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: 'Not authorized' });
     }
@@ -278,7 +268,6 @@ exports.rescheduleAppointment = async (req, res) => {
     const startMin = toMinutes(startTime);
     const endMin = startMin + service.duration;
 
-    // ❗ Block only ACCEPTED appointments
     const conflict = await Appointment.findOne({
       _id: { $ne: appointment._id },
       provider: appointment.provider,
@@ -300,7 +289,7 @@ exports.rescheduleAppointment = async (req, res) => {
     appointment.date = date;
     appointment.startTime = startTime;
     appointment.endTime = toTime(endMin);
-    appointment.status = 'pending'; // reset approval
+    appointment.status = 'pending'; 
 
     await appointment.save();
 

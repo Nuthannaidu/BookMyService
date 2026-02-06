@@ -3,7 +3,7 @@ const User = require('../models/User');
 
 const ALLOWED_CATEGORIES = ['medical', 'saloon', 'car_rental'];
 
-/* ================= CREATE SERVICE (UNCHANGED) ================= */
+/*CREATE SERVICE */
 exports.createService = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
@@ -75,7 +75,7 @@ exports.createService = async (req, res) => {
   }
 };
 
-/* ================= UPDATE SERVICE (NEW) ================= */
+/* UPDATE SERVICE */
 exports.updateService = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
@@ -121,7 +121,7 @@ exports.updateService = async (req, res) => {
   }
 };
 
-/* ================= DELETE SERVICE (NEW) ================= */
+/* DELETE SERVICE*/
 exports.deleteService = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
@@ -150,7 +150,7 @@ exports.deleteService = async (req, res) => {
   }
 };
 
-/* ================= READ OPERATIONS (UNCHANGED) ================= */
+/*READ OPERATIONS*/
 exports.getAllProvidersWithServices = async (req, res) => {
   try {
     const providers = await User.find({ role: 'provider' }).select('name');
