@@ -1,6 +1,6 @@
 const Service = require('../models/Service');
 const User = require('../models/User');
-
+const Appointment = require('../models/Appointment'); 
 const ALLOWED_CATEGORIES = ['medical', 'saloon', 'car_rental'];
 
 /*CREATE SERVICE */
