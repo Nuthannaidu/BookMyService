@@ -30,7 +30,6 @@ const serviceSchema = new mongoose.Schema(
       required: true,
     },
 
-    // category-specific fields
     details: {
       medical: {
         specialization: String,

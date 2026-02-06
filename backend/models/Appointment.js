@@ -45,10 +45,6 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       enum: ['user', 'provider'],
     },
-
-    cancelReason: {
-      type: String,
-    },
   },
   { timestamps: true }
 );
