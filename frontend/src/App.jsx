@@ -12,6 +12,7 @@ import MyBookings from './pages/patient/MyBookings';
 import Dashboard from './pages/provider/Dashboard';
 import ScheduleManager from './pages/provider/ScheduleManager';
 import AddService from './pages/provider/AddService';
+import AllBookings from './pages/provider/AllBookings'; // ✅ 1. Import New Page
 
 const App = () => {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ const App = () => {
           element={!user ? <Register /> : <Navigate to="/" />}
         />
 
+        {/* Patient Routes */}
         <Route
           path="/book"
           element={user ? <Booking /> : <Navigate to="/login" />}
@@ -45,11 +47,24 @@ const App = () => {
           element={user ? <MyBookings /> : <Navigate to="/login" />}
         />
 
+        {/* Provider Routes */}
         <Route
           path="/provider/dashboard"
           element={
             user?.role === 'provider' ? (
               <Dashboard />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+
+        {/* ✅ 2. Add New Route Here */}
+        <Route
+          path="/provider/bookings"
+          element={
+            user?.role === 'provider' ? (
+              <AllBookings />
             ) : (
               <Navigate to="/" />
             )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom'; // Ensure Link is imported
 import API from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 
@@ -59,28 +59,13 @@ const Dashboard = () => {
 
   /* ================= EDIT LOGIC ================= */
   const openEditModal = (service) => {
-    setEditingService({ ...service }); // Create a copy to edit
+    setEditingService({ ...service });
     setIsEditModalOpen(true);
   };
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditingService((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Keep this function if you ever want to re-enable editing in future, 
-  // but for now, inputs using this will be read-only.
-  const handleEditDetailsChange = (category, field, value) => {
-    setEditingService((prev) => ({
-      ...prev,
-      details: {
-        ...prev.details,
-        [category]: {
-          ...prev.details[category],
-          [field]: value,
-        },
-      },
-    }));
   };
 
   const saveEditedService = async (e) => {
@@ -96,7 +81,6 @@ const Dashboard = () => {
         details
       });
 
-      // Update local state
       setServices((prev) => prev.map((s) => (s._id === _id ? data : s)));
       setIsEditModalOpen(false);
       setEditingService(null);
@@ -154,6 +138,8 @@ const Dashboard = () => {
 
         {/* STATS CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* Card 1: Total Services (Not Clickable) */}
           <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-2xl">💼</div>
@@ -162,14 +148,17 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-gray-900">{services.length}</p>
           </div>
 
-          <div className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+          {/* Card 2: Total Bookings (CLICKABLE -> ALL) */}
+          <Link to="/provider/bookings?filter=all" className="bg-white border-2 border-gray-200 rounded-2xl p-6 hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer block">
             <div className="flex items-center justify-between mb-3">
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-2xl">📊</div>
+              <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">View All →</span>
             </div>
             <p className="text-sm font-medium text-gray-600 mb-1">Total Bookings</p>
             <p className="text-3xl font-bold text-gray-900">{appointments.length}</p>
-          </div>
+          </Link>
 
+          {/* Card 3: Pending (Not Clickable, view below) */}
           <div className="bg-white border-2 border-yellow-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center text-2xl">⏳</div>
@@ -178,16 +167,18 @@ const Dashboard = () => {
             <p className="text-3xl font-bold text-yellow-600">{pending.length}</p>
           </div>
 
-          <div className="bg-white border-2 border-green-200 rounded-2xl p-6 hover:shadow-lg transition-shadow">
+          {/* Card 4: Completed (CLICKABLE -> COMPLETED) */}
+          <Link to="/provider/bookings?filter=completed" className="bg-white border-2 border-green-200 rounded-2xl p-6 hover:shadow-lg hover:border-green-400 transition-all cursor-pointer block">
             <div className="flex items-center justify-between mb-3">
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center text-2xl">✓</div>
+              <span className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded">View History →</span>
             </div>
             <p className="text-sm font-medium text-gray-600 mb-1">Completed</p>
             <p className="text-3xl font-bold text-green-600">{completed.length}</p>
-          </div>
+          </Link>
         </div>
 
-        {/* PENDING REQUESTS SECTION */}
+        {/* PENDING REQUESTS SECTION (UNCHANGED) */}
         <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Pending Requests</h2>
@@ -227,7 +218,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* MY SERVICES SECTION */}
+        {/* MY SERVICES SECTION (UNCHANGED) */}
         <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">My Services</h2>
@@ -279,7 +270,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* EDIT SERVICE MODAL */}
+      {/* EDIT SERVICE MODAL (UNCHANGED) */}
       {isEditModalOpen && editingService && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeIn">
@@ -325,7 +316,6 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              {/* DYNAMIC DETAILS - READ ONLY */}
               {editingService.details && editingService.details[editingService.category] && (
                 <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
                   <h4 className="text-xs font-bold text-gray-500 uppercase">

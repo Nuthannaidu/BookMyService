@@ -7,7 +7,6 @@ const MyBookings = () => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [error, setError] = useState('');
 
-  // Reschedule State
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [targetAppointment, setTargetAppointment] = useState(null);
   const [newDate, setNewDate] = useState('');
@@ -19,7 +18,6 @@ const MyBookings = () => {
     fetchAppointments();
   }, []);
 
-  // ✅ Fetch appointments & normalize IDs (INTERNAL ONLY)
   const fetchAppointments = () => {
     API.get('/appointments/my')
       .then((res) => {
@@ -37,29 +35,19 @@ const MyBookings = () => {
       });
   };
 
-  // ✅ Fetch slots when reschedule date changes
   useEffect(() => {
-    if (
-      newDate &&
-      targetAppointment?.providerId &&
-      targetAppointment?.serviceId
-    ) {
-      fetchSlots(
-        targetAppointment.providerId,
-        targetAppointment.serviceId,
-        newDate
-      );
+    if (newDate && targetAppointment?.providerId && targetAppointment?.serviceId) {
+      fetchSlots(targetAppointment.providerId, targetAppointment.serviceId, newDate);
     }
   }, [newDate, targetAppointment]);
 
-  // ✅ Correct slot fetch (API RETURNS ARRAY)
   const fetchSlots = async (providerId, serviceId, date) => {
     setLoadingSlots(true);
     try {
       const { data } = await API.get('/appointments/availability', {
         params: { providerId, serviceId, date },
       });
-      setAvailableSlots(data); // IMPORTANT FIX
+      setAvailableSlots(data);
     } catch (err) {
       console.error('Slot fetch failed', err);
       setAvailableSlots([]);
@@ -119,6 +107,24 @@ const MyBookings = () => {
     }
   };
 
+  const getDateParts = (dateString) => {
+    if (!dateString) return { month: '---', day: '--' };
+    const date = new Date(dateString);
+    return {
+      month: date.toLocaleString('default', { month: 'short' }).toUpperCase(),
+      day: date.getDate(),
+    };
+  };
+
+  const formatTime = (time) => {
+    if (!time) return '';
+    const [h, m] = time.split(':');
+    const hour = parseInt(h);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour}:${m} ${ampm}`;
+  };
+
   const upcoming = appointments.filter((a) =>
     ['pending', 'confirmed', 'accepted'].includes(a.status)
   );
@@ -138,8 +144,6 @@ const MyBookings = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-5xl mx-auto">
-
-        {/* Header */}
         <div className="flex justify-between items-center mb-10">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">My Appointments</h1>
@@ -150,9 +154,7 @@ const MyBookings = () => {
             <button
               onClick={() => setActiveTab('upcoming')}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${
-                activeTab === 'upcoming'
-                  ? 'bg-black text-white'
-                  : 'text-gray-500'
+                activeTab === 'upcoming' ? 'bg-black text-white' : 'text-gray-500'
               }`}
             >
               Upcoming
@@ -160,9 +162,7 @@ const MyBookings = () => {
             <button
               onClick={() => setActiveTab('history')}
               className={`px-6 py-2.5 rounded-lg text-sm font-semibold ${
-                activeTab === 'history'
-                  ? 'bg-black text-white'
-                  : 'text-gray-500'
+                activeTab === 'history' ? 'bg-black text-white' : 'text-gray-500'
               }`}
             >
               History
@@ -176,126 +176,142 @@ const MyBookings = () => {
           </div>
         )}
 
-        {/* Appointment List */}
         <div className="space-y-4">
           {displayList.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-2xl border border-dashed">
               No {activeTab} appointments found.
             </div>
           ) : (
-            displayList.map((a) => (
-              <div
-                key={a._id}
-                className="bg-white rounded-2xl p-5 border shadow-sm grid md:grid-cols-12 gap-6 items-center"
-              >
-                <div className="md:col-span-4 flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
-                    {a.service?.name?.charAt(0) || 'S'}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">
-                      {a.service?.name}
-                    </h3>
-                  </div>
-                </div>
+            displayList.map((a) => {
+              const { month, day } = getDateParts(a.date);
 
-                <div className="md:col-span-3">
-                  <div className="text-gray-700">📅 {a.date}</div>
-                  <div className="text-sm text-gray-500">
-                    ⏰ {a.startTime} - {a.endTime}
+              return (
+                <div
+                  key={a._id}
+                  className="bg-white rounded-2xl p-5 border shadow-sm grid grid-cols-1 md:grid-cols-12 gap-6 items-center"
+                >
+                  <div className="md:col-span-4 flex items-center gap-5">
+                    <div className="flex flex-col items-center justify-center bg-gray-50 border border-gray-100 rounded-xl p-3 min-w-[70px]">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{month}</span>
+                      <span className="text-2xl font-extrabold text-gray-900 leading-none">{day}</span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-lg leading-tight">
+                        {a.service?.name || "Unknown Service"}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        by {a.provider?.name || "Provider"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <div className="text-sm font-bold text-gray-900 whitespace-nowrap">
+                      {formatTime(a.startTime)} - {formatTime(a.endTime)}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <span
+                      className={`inline-block px-3 py-1.5 rounded-full text-xs font-bold border capitalize ${getStatusStyle(
+                        a.status
+                      )}`}
+                    >
+                      {a.status}
+                    </span>
+                  </div>
+
+                  <div className="md:col-span-3 flex justify-end gap-3">
+                    {['pending', 'accepted', 'confirmed'].includes(a.status) && (
+                      <>
+                        <button
+                          onClick={() => handleRescheduleClick(a)}
+                          className="px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                        >
+                          Reschedule
+                        </button>
+                        <button
+                          onClick={() => cancelBooking(a._id)}
+                          className="px-4 py-2 text-xs font-bold text-red-600 border border-gray-200 hover:bg-red-50 hover:border-red-100 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                <div className="md:col-span-2">
-                  <span
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold border ${getStatusStyle(
-                      a.status
-                    )}`}
-                  >
-                    {a.status}
-                  </span>
-                </div>
-
-                <div className="md:col-span-3 flex justify-end gap-3">
-                  {['pending', 'accepted', 'confirmed'].includes(a.status) && (
-                    <>
-                      <button
-                        onClick={() => handleRescheduleClick(a)}
-                        className="px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg"
-                      >
-                        Reschedule
-                      </button>
-                      <button
-                        onClick={() => cancelBooking(a._id)}
-                        className="px-4 py-2 text-xs font-bold text-red-600 border rounded-lg"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* Reschedule Modal */}
       {isRescheduleModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl w-full max-w-md">
-            <div className="p-6 border-b">
-              <h3 className="font-bold text-lg">Reschedule Appointment</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-6 border-b bg-gray-50">
+              <h3 className="font-bold text-lg text-gray-900">Reschedule Appointment</h3>
+              <p className="text-sm text-gray-500 mt-1">Select a new date and time.</p>
             </div>
 
-            <div className="p-6 space-y-4">
-              <input
-                type="date"
-                className="w-full p-3 border rounded-xl"
-                min={new Date().toISOString().split('T')[0]}
-                value={newDate}
-                onChange={(e) => {
-                  setNewDate(e.target.value);
-                  setNewSlot('');
-                }}
-              />
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Select New Date</label>
+                <input
+                  type="date"
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-black outline-none"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={newDate}
+                  onChange={(e) => {
+                    setNewDate(e.target.value);
+                    setNewSlot('');
+                  }}
+                />
+              </div>
 
-              {loadingSlots ? (
-                <div className="text-center text-sm text-gray-400">
-                  Checking availability...
-                </div>
-              ) : (
-                <div className="grid grid-cols-4 gap-2">
-                  {availableSlots.map((slot) => (
-                    <button
-                      key={slot.startTime}
-                      onClick={() => setNewSlot(slot.startTime)}
-                      className={`py-2 text-xs font-bold rounded-lg border ${
-                        newSlot === slot.startTime
-                          ? 'bg-black text-white'
-                          : 'bg-white'
-                      }`}
-                    >
-                      {slot.startTime}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Available Slots</label>
+                {loadingSlots ? (
+                  <div className="text-center text-sm text-gray-400 py-4 bg-gray-50 rounded-lg">
+                    Checking availability...
+                  </div>
+                ) : newDate && availableSlots.length === 0 ? (
+                  <div className="text-center text-sm text-gray-400 py-4 bg-gray-50 rounded-lg">
+                    No slots available for this date.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {availableSlots.map((slot) => (
+                      <button
+                        key={slot.startTime}
+                        onClick={() => setNewSlot(slot.startTime)}
+                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                          newSlot === slot.startTime
+                            ? 'bg-black text-white border-black'
+                            : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        {formatTime(slot.startTime)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="p-6 border-t flex gap-3">
+            <div className="p-6 border-t flex gap-3 bg-gray-50">
               <button
                 onClick={() => setIsRescheduleModalOpen(false)}
-                className="flex-1 py-3 border rounded-xl"
+                className="flex-1 py-3 font-bold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmReschedule}
                 disabled={!newSlot}
-                className="flex-1 py-3 bg-black text-white rounded-xl disabled:bg-gray-300"
+                className="flex-1 py-3 font-bold text-white bg-black rounded-xl disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-gray-800 transition"
               >
-                Confirm
+                Confirm Reschedule
               </button>
             </div>
           </div>
