@@ -125,27 +125,34 @@ exports.updateService = async (req, res) => {
 exports.deleteService = async (req, res) => {
   try {
     if (req.user.role !== 'provider') {
-      return res.status(403).json({
-        message: 'Only providers can delete services',
-      });
+      return res.status(403).json({ message: 'Only providers can delete services' });
     }
 
     const service = await Service.findById(req.params.serviceId);
-
     if (!service) {
       return res.status(404).json({ message: 'Service not found' });
     }
 
     if (service.provider.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        message: 'You are not allowed to delete this service',
+      return res.status(403).json({ message: 'Not allowed' });
+    }
+
+    // Check appointments using this service
+    const hasAppointments = await Appointment.exists({
+      service: service._id,
+      status: { $in: ['pending', 'accepted'] }
+    });
+
+    if (hasAppointments) {
+      return res.status(400).json({
+        message: 'Cannot delete service with active appointments',
       });
     }
 
     await service.deleteOne();
     res.json({ message: 'Service deleted successfully' });
+
   } catch (error) {
-    console.error('DELETE SERVICE ERROR:', error);
     res.status(500).json({ message: 'Failed to delete service' });
   }
 };
