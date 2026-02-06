@@ -12,183 +12,231 @@ const DAYS = [
   { label: 'Saturday', value: 6 },
 ];
 
-const defaultWeek = DAYS.map((d) => ({
-  dayOfWeek: d.value,
-  enabled: false,
-  startTime: '09:00',
-  endTime: '17:00',
-}));
-
 const ScheduleManager = () => {
   const { user } = useAuth();
   const [services, setServices] = useState([]);
   const [serviceId, setServiceId] = useState('');
-  const [week, setWeek] = useState(defaultWeek);
+  
+  // State: structure is { 0: [{startTime, endTime}], 1: [...], ... }
+  const [schedule, setSchedule] = useState({}); 
   const [unavailableDates, setUnavailableDates] = useState('');
   const [message, setMessage] = useState('');
 
+  // 1. Fetch Services List
   useEffect(() => {
     API.get(`/services/${user._id}`).then((res) => setServices(res.data));
   }, [user._id]);
 
-  const toggleDay = (index) => {
-    const copy = [...week];
-    copy[index].enabled = !copy[index].enabled;
-    setWeek(copy);
+  // 2. Fetch & Populate Schedule when Service ID changes
+  useEffect(() => {
+    if (!serviceId) return;
+    
+    const fetchSchedule = async () => {
+      try {
+        // Initialize empty structure first
+        const formattedSchedule = {};
+        DAYS.forEach(d => formattedSchedule[d.value] = []);
+
+        // Call the new backend endpoint
+        const { data } = await API.get(`/appointments/schedule/${serviceId}`);
+
+        // Populate the structure with incoming data
+        if (data.workingHours && Array.isArray(data.workingHours)) {
+          data.workingHours.forEach(shift => {
+            // Ensure the day array exists before pushing
+            if (formattedSchedule[shift.dayOfWeek]) {
+              formattedSchedule[shift.dayOfWeek].push({
+                startTime: shift.startTime,
+                endTime: shift.endTime
+              });
+            }
+          });
+        }
+
+        setSchedule(formattedSchedule);
+        
+        // Convert array ["2024-01-01", "2024-02-02"] -> String "2024-01-01, 2024-02-02"
+        setUnavailableDates(
+          data.unavailableDates ? data.unavailableDates.join(', ') : ''
+        );
+
+      } catch (err) {
+        console.error("Failed to load schedule", err);
+      }
+    };
+
+    fetchSchedule();
+  }, [serviceId]);
+
+  /* ==================== HANDLERS ==================== */
+
+  const addShift = (dayValue) => {
+    setSchedule(prev => ({
+      ...prev,
+      [dayValue]: [...prev[dayValue], { startTime: '09:00', endTime: '12:00' }]
+    }));
   };
 
-  const updateTime = (index, field, value) => {
-    const copy = [...week];
-    copy[index][field] = value;
-    setWeek(copy);
+  const removeShift = (dayValue, shiftIndex) => {
+    setSchedule(prev => ({
+      ...prev,
+      [dayValue]: prev[dayValue].filter((_, i) => i !== shiftIndex)
+    }));
+  };
+
+  const updateShift = (dayValue, shiftIndex, field, value) => {
+    setSchedule(prev => {
+      const dayShifts = [...prev[dayValue]];
+      dayShifts[shiftIndex] = { ...dayShifts[shiftIndex], [field]: value };
+      return { ...prev, [dayValue]: dayShifts };
+    });
   };
 
   const saveSchedule = async () => {
-    const workingHours = week
-      .filter((d) => d.enabled)
-      .map((d) => ({
-        dayOfWeek: d.dayOfWeek,
-        startTime: d.startTime,
-        endTime: d.endTime,
-      }));
+    // Convert State Object -> Backend Array
+    const workingHours = [];
+    Object.entries(schedule).forEach(([dayVal, shifts]) => {
+      shifts.forEach(shift => {
+        workingHours.push({
+          dayOfWeek: Number(dayVal),
+          startTime: shift.startTime,
+          endTime: shift.endTime
+        });
+      });
+    });
 
     try {
       await API.post('/appointments/schedule', {
         serviceId,
         workingHours,
-        unavailableDates: unavailableDates
-          ? unavailableDates.split(',').map((d) => d.trim())
+        // Convert String -> Array
+        unavailableDates: unavailableDates 
+          ? unavailableDates.split(',').map(d => d.trim()) 
           : [],
       });
-      setMessage('Schedule saved successfully!');
-    } catch {
-      setMessage('Failed to save schedule. Please try again.');
+      setMessage({ type: 'success', text: 'Schedule updated successfully!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: 'Failed to save schedule.' });
     }
   };
 
-  const hasWorkingDay = week.some((d) => d.enabled);
-
   return (
-    <div className="min-h-screen bg-gray-50 flex justify-center items-start py-10 px-4">
-      <div className="w-full max-w-3xl bg-white rounded-xl shadow-md border border-gray-200 p-6">
-
+    <div className="min-h-screen bg-gray-50 py-12 px-4 flex justify-center">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+        
         {/* HEADER */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white border-b border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Manage Availability</h1>
-            <p className="text-sm text-gray-500">
-              Set weekly working hours for each service
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">Manage Availability</h1>
+            <p className="text-gray-500 mt-1">Select a service to view or edit its schedule.</p>
           </div>
-
           <select
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+            className="p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-black outline-none bg-gray-50 font-medium"
             value={serviceId}
             onChange={(e) => setServiceId(e.target.value)}
           >
-            <option value="">Select Service</option>
+            <option value="">Select Service...</option>
             {services.map((s) => (
-              <option key={s._id} value={s._id}>
-                {s.name} ({s.duration} min)
-              </option>
+              <option key={s._id} value={s._id}>{s.name}</option>
             ))}
           </select>
         </div>
 
-        {/* BODY */}
         {serviceId ? (
-          <>
-            <div className="space-y-3">
-              {week.map((d, i) => (
-                <div
-                  key={d.dayOfWeek}
-                  className={`flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-md border ${
-                    d.enabled
-                      ? 'border-gray-200 bg-white'
-                      : 'border-gray-100 bg-gray-50 opacity-80'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 w-full sm:w-1/3">
-                    <input
-                      type="checkbox"
-                      checked={d.enabled}
-                      onChange={() => toggleDay(i)}
-                      className="w-4 h-4 accent-black"
-                    />
-                    <span className={`text-sm font-medium ${
-                      d.enabled ? 'text-gray-900' : 'text-gray-500'
-                    }`}>
-                      {DAYS[i].label}
-                    </span>
-                  </div>
+          <div className="p-6 md:p-8 space-y-6">
+            
+            {/* DAYS LIST */}
+            <div className="space-y-4">
+              {DAYS.map((day) => {
+                const dayShifts = schedule[day.value] || [];
+                const isActive = dayShifts.length > 0;
 
-                  <div className="flex items-center gap-2 w-full sm:w-2/3 justify-end">
-                    <input
-                      type="time"
-                      disabled={!d.enabled}
-                      value={d.startTime}
-                      onChange={(e) => updateTime(i, 'startTime', e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded-md text-sm disabled:bg-gray-100"
-                    />
-                    <span className="text-gray-400">-</span>
-                    <input
-                      type="time"
-                      disabled={!d.enabled}
-                      value={d.endTime}
-                      onChange={(e) => updateTime(i, 'endTime', e.target.value)}
-                      className="px-2 py-1 border border-gray-300 rounded-md text-sm disabled:bg-gray-100"
-                    />
+                return (
+                  <div key={day.value} className={`border rounded-xl p-4 transition-all ${isActive ? 'bg-white border-gray-300' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                      
+                      {/* Day Label & Add Button */}
+                      <div className="w-full sm:w-32 pt-2 flex flex-row sm:flex-col justify-between items-center sm:items-start">
+                        <span className={`font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>{day.label}</span>
+                        <button 
+                          onClick={() => addShift(day.value)}
+                          className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition"
+                        >
+                          + Add Shift
+                        </button>
+                      </div>
+
+                      {/* Shifts Container */}
+                      <div className="flex-1 space-y-3">
+                        {dayShifts.length === 0 && (
+                          <div className="text-sm text-gray-400 italic pt-2">No working hours (Day Off)</div>
+                        )}
+
+                        {dayShifts.map((shift, index) => (
+                          <div key={index} className="flex items-center gap-3 animate-fadeIn">
+                            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1.5 border border-gray-200">
+                              <input
+                                type="time"
+                                value={shift.startTime}
+                                onChange={(e) => updateShift(day.value, index, 'startTime', e.target.value)}
+                                className="bg-transparent text-sm font-medium focus:outline-none w-24 text-center"
+                              />
+                              <span className="text-gray-400">-</span>
+                              <input
+                                type="time"
+                                value={shift.endTime}
+                                onChange={(e) => updateShift(day.value, index, 'endTime', e.target.value)}
+                                className="bg-transparent text-sm font-medium focus:outline-none w-24 text-center"
+                              />
+                            </div>
+                            
+                            <button 
+                              onClick={() => removeShift(day.value, index)}
+                              className="text-gray-400 hover:text-red-600 transition p-1"
+                              title="Remove this shift"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* HOLIDAYS */}
-            <div className="mt-6">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Block Dates (Holidays)
-              </label>
+            <div className="bg-red-50 p-5 rounded-xl border border-red-100">
+              <label className="block text-sm font-bold text-red-900 mb-2">Block Specific Dates</label>
               <input
                 type="text"
-                placeholder="YYYY-MM-DD, YYYY-MM-DD"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="2024-12-25, 2024-01-01"
+                className="w-full p-3 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none bg-white"
                 value={unavailableDates}
                 onChange={(e) => setUnavailableDates(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Separate dates with commas
-              </p>
             </div>
 
             {/* SAVE BUTTON */}
-            <div className="mt-6">
-              <button
-                onClick={saveSchedule}
-                disabled={!hasWorkingDay}
-                className={`w-full py-2.5 rounded-md font-semibold transition ${
-                  hasWorkingDay
-                    ? 'bg-black text-white hover:bg-gray-800'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Save Schedule
-              </button>
-            </div>
+            <button
+              onClick={saveSchedule}
+              className="w-full py-4 rounded-xl font-bold text-lg bg-black text-white hover:bg-gray-800 shadow-lg transition-transform hover:-translate-y-0.5"
+            >
+              Update Schedule
+            </button>
 
             {message && (
-              <div className={`mt-4 text-sm text-center ${
-                message.includes('success')
-                  ? 'text-green-600'
-                  : 'text-red-600'
-              }`}>
-                {message}
-              </div>
+               <div className={`p-4 rounded-lg text-center font-medium ${
+                 message.type === 'success' ? 'bg-green-50 text-green-700' : 
+                 message.type === 'info' ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'
+               }`}>
+                 {message.text}
+               </div>
             )}
-          </>
-        ) : (
-          <div className="mt-10 text-center text-gray-500 text-sm border border-dashed border-gray-300 rounded-md py-10">
-            Select a service to configure its schedule
           </div>
+        ) : (
+          <div className="py-20 text-center text-gray-400">Please select a service above.</div>
         )}
       </div>
     </div>

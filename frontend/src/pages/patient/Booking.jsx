@@ -10,10 +10,20 @@ const Booking = () => {
   const [date, setDate] = useState('');
   const [slots, setSlots] = useState([]);
   const [selectedSlot, setSelectedSlot] = useState('');
-  const [blockedSlots, setBlockedSlots] = useState([]); // ✅ NEW
+  const [blockedSlots, setBlockedSlots] = useState([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  /* ---------------- Helper: Format Time to AM/PM ---------------- */
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    const [hour, minute] = timeString.split(':');
+    const h = parseInt(hour, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const formattedHour = h % 12 || 12;
+    return `${formattedHour}:${minute} ${ampm}`;
+  };
 
   /* ---------------- Load Services ---------------- */
   useEffect(() => {
@@ -40,7 +50,7 @@ const Booking = () => {
     setLoadingSlots(true);
     setSlots([]);
     setSelectedSlot('');
-    setBlockedSlots([]); // reset for new date
+    setBlockedSlots([]);
 
     API.get('/appointments/availability', {
       params: {
@@ -58,8 +68,9 @@ const Booking = () => {
   const bookService = async () => {
     if (!selectedSlot) return;
 
+    // Use formatTime here so the confirmation alert is also readable
     const ok = window.confirm(
-      `Confirm booking for ${selectedService.name} on ${date} at ${selectedSlot}?`
+      `Confirm booking for ${selectedService.name} on ${date} at ${formatTime(selectedSlot)}?`
     );
     if (!ok) return;
 
@@ -68,10 +79,9 @@ const Booking = () => {
         providerId: selectedService.providerId,
         serviceId: selectedService._id,
         date,
-        startTime: selectedSlot,
+        startTime: selectedSlot, // Send original 24h format to backend
       });
 
-      // ✅ Optimistic UI block
       setBlockedSlots((prev) => [...prev, selectedSlot]);
       setSelectedSlot('');
 
@@ -222,7 +232,8 @@ const Booking = () => {
                                 ⏳
                               </span>
                             )}
-                            {slot.startTime}
+                            {/* Display formatted AM/PM time */}
+                            {formatTime(slot.startTime)}
                           </button>
                         );
                       })}

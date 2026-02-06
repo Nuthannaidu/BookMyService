@@ -6,7 +6,27 @@ const isPastEndTime = (date, endTime) => {
   const appointmentEnd = new Date(`${date}T${endTime}`);
   return appointmentEnd < new Date();
 };
+/* ---------------- Get Schedule (For Provider Dashboard) ---------------- */
+exports.getSchedule = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+    
+    // Find the schedule for this service and provider
+    const schedule = await Schedule.findOne({ 
+      provider: req.user._id, 
+      service: serviceId 
+    });
 
+    if (!schedule) {
+      // If no schedule exists yet, return empty defaults
+      return res.json({ workingHours: [], unavailableDates: [] });
+    }
+
+    res.json(schedule);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching schedule' });
+  }
+};
 /* ---------------- Time Helpers ---------------- */
 const toMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -63,11 +83,12 @@ exports.getAvailability = async (req, res) => {
     if (schedule.unavailableDates.includes(date)) return res.json([]);
 
     const day = new Date(date).getDay();
-    const rule = schedule.workingHours.find(d => d.dayOfWeek === day);
-    if (!rule) return res.json([]);
 
-    const startMin = toMinutes(rule.startTime);
-    const endMin = toMinutes(rule.endTime);
+    // ✅ CHANGED: Filter ALL shifts for the day (supports split shifts)
+    const dailyShifts = schedule.workingHours.filter(d => d.dayOfWeek === day);
+    
+    if (dailyShifts.length === 0) return res.json([]);
+
     const duration = service.duration;
 
     /* 🔥 GLOBAL SLOT BLOCKING */
@@ -85,18 +106,27 @@ exports.getAvailability = async (req, res) => {
 
     const slots = [];
 
-    for (let t = startMin; t + duration <= endMin; t += duration) {
-      const conflict = bookedRanges.some(
-        b => t < b.end && t + duration > b.start
-      );
+    // ✅ CHANGED: Loop through EACH shift found for the day
+    for (const shift of dailyShifts) {
+      const startMin = toMinutes(shift.startTime);
+      const endMin = toMinutes(shift.endTime);
 
-      if (!conflict) {
-        slots.push({
-          startTime: toTime(t),
-          endTime: toTime(t + duration),
-        });
+      for (let t = startMin; t + duration <= endMin; t += duration) {
+        const conflict = bookedRanges.some(
+          b => t < b.end && t + duration > b.start
+        );
+
+        if (!conflict) {
+          slots.push({
+            startTime: toTime(t),
+            endTime: toTime(t + duration),
+          });
+        }
       }
     }
+
+    // ✅ CHANGED: Sort slots chronologically (Shift 1 -> Shift 2)
+    slots.sort((a, b) => toMinutes(a.startTime) - toMinutes(b.startTime));
 
     res.json(slots);
   } catch (err) {
